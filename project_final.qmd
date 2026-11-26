@@ -1,0 +1,117 @@
+---
+title: "STAT 204 - Project: What makes a Top WNBA Player?"
+author: "Mathis Aubert, Shubham Marathe" 
+date: today
+format:
+  html:
+    toc: true
+    embed-resources: true
+    code-fold: true
+---
+
+# The project
+
+**Question.** Which measurable traits (box-score statistics and physical attributes) are most associated with a WNBA player's on-court impact, what are the five most important ones, and what does the profile of a top player look like?
+
+**Data.** Four tables from the [`wehoop`](https://wehoop.sportsdataverse.org/) R package (Gilani & Hutchinson, 2026), regular seasons 2015 to 2025, combined into one table with one row per player and season:
+
+| Object in R | wehoop function | Source | One row per | What we use |
+|---|---|---|---|---|
+| `box` | `load_wnba_player_box()` | ESPN box scores | player and game | minutes, points, rebounds, assists, steals, blocks, turnovers, fouls, shots, plus-minus, position |
+| `bio` | `load_wnba_player_core()` | ESPN player profiles | player and season | height, weight, date of birth |
+| `impact` | `load_wnba_player_impact()` | WNBA Stats ratings | player and season | RAPM (the response) |
+| `xwalk` | `load_wnba_player_crosswalk()` | links ESPN and WNBA Stats IDs | player and season | the two player IDs, to join `impact` |
+
+**Glossary of Terms**
+
+- **Box score:** a structured table summarizing the individual and team statistics from a basketball game.
+- **Regularized Adjusted Plus-Minus (RAPM):** a basketball analytics metric that estimates a player's net scoring impact per 100 possessions while controlling for teammates, opponents, and game score.
+- **Plus-minus:** measures a player's or lineup's point differential while on the court—calculated as team points scored minus team points allowed during those minutes.
+
+# Before you render (one time only)
+
+1. **Get the project.** Clone the repository, then in Positron use *File → Open Folder* and choose `STAT204-project-FALL26`.
+
+2. **Install the exact package versions.** This project uses [`renv`](https://rstudio.github.io/renv/). When you open the folder, `renv` starts automatically (via `.Rprofile`). In the R console, run:
+
+```{r}
+#| label: restore
+#| eval: false
+renv::restore()
+```
+
+# Setup
+
+All data come from the `wehoop` R package. We use the regular seasons 2015 to 2025.
+
+```{r}
+#| label: setup
+library(wehoop)
+
+box <- load_wnba_player_box(seasons = 2015:2025) # one row per player per game
+bio <- load_wnba_player_core(seasons = 2015:2025) # height, weight, birth date, etc
+impact <- load_wnba_player_impact(seasons = 2015:2025) # RAPM rating of each player
+xwalk <- load_wnba_player_crosswalk(seasons = 2015:2025) # links the two kinds of player ID
+
+```
+
+# Exploratory data analysis
+
+## Guiding questions
+
+- Which player features (statistics and physical attributes) are most related to a player's impact?
+- Are there missing values or outliers to address before the regression?
+- What are the top 5 features?
+- What does the profile ("persona") of a top player look like?
+
+## Our analysis
+
+### Data introspection
+
+#### box
+```{r}
+#| label: dim-box
+dim(box)
+```
+
+```{r}
+#| label: str-box
+str(box[, c("season", "season_type", "athlete_display_name", "athlete_position_abbreviation",
+            "minutes", "points", "rebounds", "assists", "plus_minus", "did_not_play")])
+```
+
+There is one row per player per game. `season_type` is 2 for the regular season and 3 for the playoffs. `plus_minus` is stored as text (for example `"+5"`), so we need to convert it to a number.
+
+#### bio
+
+```{r}
+#| label: dim-bio
+dim(bio)
+```
+
+```{r}
+#| label: str-bio
+str(bio[, c("season", "display_name", "position_name", "height", "age", "experience_years")])
+```
+
+There is one row per player per season. Information that would be useful for our model are: the name of the player, position name, her height, her age and her experience in years.
+
+Position name and their signigication:
+
+- **Guard:** A quick perimeter player who brings the ball up the court, passes to teammates, and shoots from long range.
+- **Forward:** A versatile, mid-sized player who scores both inside and outside while helping with rebounding and defense.
+- **Center:** The tallest player on the team who stays near the basket to score close-range shots, grab rebounds, and block opponents.
+
+#### impact
+```{r}
+#| label: dim-impact
+dim(impact)
+```
+
+```{r}
+#| label: str-impact
+str(impact[, c("season", "season_type", "player_name", "rapm")])
+```
+
+There is one row per player per season. The Regularized Adjusted Plus-Minus (RAPM) is the main variable that we will try to use to find our best players and look at their associated attributes.
+
