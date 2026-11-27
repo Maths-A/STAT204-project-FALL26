@@ -91,7 +91,7 @@ dim(bio)
 
 ```{r}
 #| label: str-bio
-str(bio[, c("season", "display_name", "position_name", "height", "age", "experience_years")])
+str(bio[, c("season", "display_name", "position_name", "height", "weight", "age", "experience_years")])
 ```
 
 There is one row per player per season. Information that would be useful for our model are: the name of the player, position name, her height, her age and her experience in years.
@@ -110,8 +110,37 @@ dim(impact)
 
 ```{r}
 #| label: str-impact
-str(impact[, c("season", "season_type", "player_name", "rapm")])
+str(impact[, c("season", "season_type", "player_name", "rapm", "min")])
 ```
 
 There is one row per player per season. The Regularized Adjusted Plus-Minus (RAPM) is the main variable that we will try to use to find our best players and look at their associated attributes.
 
+### Missing values
+
+#### box
+```{r}
+#| label: missing-box
+summary(box[, c("season", "season_type", "athlete_display_name", "athlete_position_abbreviation",
+            "minutes", "points", "rebounds", "assists", "plus_minus", "did_not_play")])
+```
+
+Total rows 58,478, and about 9,400 missing or no minutes played, so it's about 16 % of the dataset. They are not errors, so we remove them. We also remove playoff games, because only good teams play them.
+
+#### bio
+
+```{r}
+#| label: missing-bio
+summary(bio[, c("season", "display_name", "position_name", "height", "weight", "age", "experience_years")])
+```
+
+Bio has no duplicated player-season rows, and height and position_name are never missing, but weight is missing for 87 rows, experience_years for 15, and age for 3. We will drop the few rows without age or experience_years.
+
+#### impact
+
+```{r}
+#| label: missing-impact
+summary(impact[, c("season", "season_type", "player_name", "rapm", "min")])
+summary(impact$min)
+```
+
+Impact also contains playoff rows, and RAPM is based on players with few minutes or none, so we should keep only regular-season rows of players with at least 250 minutes which correspond to the median.
