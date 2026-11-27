@@ -133,7 +133,7 @@ Total rows 58,478, and about 9,400 missing or no minutes played, so it's about 1
 summary(bio[, c("season", "display_name", "position_name", "height", "weight", "age", "experience_years")])
 ```
 
-Bio has no duplicated player-season rows, and height and position_name are never missing, but weight is missing for 87 rows, experience_years for 15, and age for 3. We will drop the few rows without age or experience_years.
+Bio has no duplicated player-season rows, and height and position_name are never missing, but weight is missing for 87 rows, experience_years for 15, and age for 3. We will drop the few rows without age, experience_years or weight.
 
 #### impact
 
@@ -144,3 +144,42 @@ summary(impact$min)
 ```
 
 Impact also contains playoff rows, and RAPM is based on players with few minutes or none, so we should keep only regular-season rows of players with at least 250 minutes which correspond to the median.
+
+### Cleaning
+
+#### box
+```{r}
+#| label: clean-box
+players_stats <- box[box$season_type == 2 & box$did_not_play == FALSE &
+             !is.na(box$minutes) & box$minutes > 0, ]
+players_stats$plus_minus <- as.numeric(players_stats$plus_minus)
+
+dim(players_stats)
+nrow(box) - nrow(players_stats)
+```
+
+We removed 13346 rows from box (playoff games, games the player did not play, and games with no minutes), which leaves 45132 player-games. The 53 plus_minus values became numeric.
+
+#### bio
+
+```{r}
+#| label: clean-bio
+players_bio <- bio[!is.na(bio$age) & !is.na(bio$experience_years) & !is.na(bio$weight), ]
+
+dim(players_bio)
+nrow(bio) - nrow(players_bio)
+```
+
+We removed 99 rows from bio (missing age, experience_years or weight), which leaves 1699 player-seasons.
+
+#### impact
+
+```{r}
+#| label: clean-impact
+players_impact <- impact[impact$season_type == "Regular Season" & impact$min >= 250, ]
+
+dim(players_impact)
+nrow(impact) - nrow(players_impact)
+```
+
+We removed 1402 rows from impact (playoff rows and players with fewer than 250 minutes), which leaves 1270 player-seasons.
