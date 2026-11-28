@@ -17,9 +17,10 @@ Our overall goal is to find which measurable traits are the most impactful for W
 
 **Open [`project_final.qmd`](project_final.qmd) and follow it.** In short:
 
-1. Open this folder in Positron (*File → Open Folder*).
-2. In the R console: `renv::restore()`
-3. In the terminal: `quarto render project_final.qmd`
+1. Clone the repository
+2. Open this folder in Positron (*File → Open Folder*).
+3. In the R console: `renv::restore()`
+4. In the terminal: `quarto render project_final.qmd`
 
 ## Team members
 
