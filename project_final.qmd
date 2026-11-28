@@ -191,9 +191,10 @@ We removed 1402 rows from impact (playoff rows and players with fewer than 250 m
 ```{r}
 #| label: player-mean-stat
 player_mean_stat <- players_stats |>
-  group_by(athlete_display_name, team_abbreviation) |>
+  group_by(athlete_id, season) |>
   summarise(
     number_matchs = n(),
+    athlete_display_name = first(athlete_display_name),
     ppg = mean(points, na.rm = TRUE),
     rpg = mean(rebounds, na.rm = TRUE),
     apg = mean(assists, na.rm = TRUE),
@@ -205,7 +206,7 @@ player_mean_stat <- players_stats |>
 
 # all players
 nrow(player_mean_stat)
-summary(player_mean_stat$players_stats)
+summary(player_mean_stat$number_matchs)
 sum(player_mean_stat$number_matchs < 20)
 
 # players with at least 20 games
@@ -225,4 +226,40 @@ player_mean_stat_20 |>
 - **rpg:** rebounds per game, in average. Grabbing the basketball after a missed field goal or free throw attempt. An offensive rebound happens when the shooting team retrieves its own missed shot to extend their possession, while a defensive rebound happens when the defending team grabs the miss to gain possession.
 - **apg:** assists per game, in average. A pass made directly to a teammate that leads to a made basket. To count as an assist, the scorer must immediately shoot or make a quick move toward the hoop without taking too many dribbles.
 
-Grouping by player and team gives 1,193 player-team pairs, but the median pair has only 22 games, and 548 pairs have fewer than 20 games. These short stays are mostly bench players (median 11.2 minutes per game), and their averages are based on too few games to be reliable, so we keep the 645 pairs with at least 20 games. These players play between 3.3 and 35.1 minutes per game (median 18.8).
+Grouping by player and season gives 1,743 player-seasons. The median player-season has 29 games, and 451 player-seasons have fewer than 20 games. These are mostly bench players or players who were injured (median 9.4 minutes per game), and their averages are based on too few games to be reliable, so we keep the 1,292 player-seasons with at least 20 games (353 different players). These players play between 3.8 and 38.4 minutes per game (median 21.7).
+
+### Join bio
+
+```{r}
+#| label: summarise-bio
+players_bio_summarise <- players_bio |>
+  group_by(athlete_id) |>
+  summarise(
+    # Bio part
+    height = first(height),
+    age = mean(age),
+    position_name = first(position_name),
+    experience_years = mean(experience_years),
+    .groups = "drop"
+  )
+
+players_bio_summarise |>
+  arrange(desc(height)) |>
+  head(10)
+```
+
+```{r}
+#| label: merge-stats-bio
+players_stats_bio <- player_mean_stat_20 |>
+  left_join(
+    players_bio_summarise |> distinct(athlete_id, .keep_all = TRUE),
+    by = "athlete_id"
+  )
+
+dim(players_stats_bio)
+players_stats_bio |>
+  arrange(desc(plus_minus)) |>
+  head(10)
+```
+
+We join this table to the bio on athlete_id. Since players_bio_summarise already has one row per player, the join keeps the 1,292 player-season rows with 353 different players, and adds height, age, position and experience to each row.
