@@ -47,6 +47,7 @@ All data come from the `wehoop` R package. We use the regular seasons 2015 to 20
 ```{r}
 #| label: setup
 library(wehoop)
+library(dplyr)
 
 box <- load_wnba_player_box(seasons = 2015:2025) # one row per player per game
 bio <- load_wnba_player_core(seasons = 2015:2025) # height, weight, birth date, etc
@@ -65,10 +66,11 @@ xwalk <- load_wnba_player_crosswalk(seasons = 2015:2025) # links the two kinds o
 - What does the profile ("persona") of a top player look like?
 
 ## Our analysis
+For the sections: data introspection, missing values and cleaning. We will work on each R object: box, bio and impact.
 
 ### Data introspection
 
-#### box
+#### Box
 ```{r}
 #| label: dim-box
 dim(box)
@@ -82,7 +84,7 @@ str(box[, c("season", "season_type", "athlete_display_name", "athlete_position_a
 
 There is one row per player per game. `season_type` is 2 for the regular season and 3 for the playoffs. `plus_minus` is stored as text (for example `"+5"`), so we need to convert it to a number.
 
-#### bio
+#### Bio
 
 ```{r}
 #| label: dim-bio
@@ -102,7 +104,7 @@ Position name and their signigication:
 - **Forward:** A versatile, mid-sized player who scores both inside and outside while helping with rebounding and defense.
 - **Center:** The tallest player on the team who stays near the basket to score close-range shots, grab rebounds, and block opponents.
 
-#### impact
+#### Impact
 ```{r}
 #| label: dim-impact
 dim(impact)
@@ -117,7 +119,7 @@ There is one row per player per season. The Regularized Adjusted Plus-Minus (RAP
 
 ### Missing values
 
-#### box
+#### Box
 ```{r}
 #| label: missing-box
 summary(box[, c("season", "season_type", "athlete_display_name", "athlete_position_abbreviation",
@@ -126,7 +128,7 @@ summary(box[, c("season", "season_type", "athlete_display_name", "athlete_positi
 
 Total rows 58,478, and about 9,400 missing or no minutes played, so it's about 16 % of the dataset. They are not errors, so we remove them. We also remove playoff games, because only good teams play them.
 
-#### bio
+#### Bio
 
 ```{r}
 #| label: missing-bio
@@ -135,7 +137,7 @@ summary(bio[, c("season", "display_name", "position_name", "height", "weight", "
 
 Bio has no duplicated player-season rows, and height and position_name are never missing, but weight is missing for 87 rows, experience_years for 15, and age for 3. We will drop the few rows without age, experience_years or weight.
 
-#### impact
+#### Impact
 
 ```{r}
 #| label: missing-impact
@@ -147,7 +149,7 @@ Impact also contains playoff rows, and RAPM is based on players with few minutes
 
 ### Cleaning
 
-#### box
+#### Box
 ```{r}
 #| label: clean-box
 players_stats <- box[box$season_type == 2 & box$did_not_play == FALSE &
@@ -160,7 +162,7 @@ nrow(box) - nrow(players_stats)
 
 We removed 13346 rows from box (playoff games, games the player did not play, and games with no minutes), which leaves 45132 player-games. The 53 plus_minus values became numeric.
 
-#### bio
+#### Bio
 
 ```{r}
 #| label: clean-bio
@@ -172,7 +174,7 @@ nrow(bio) - nrow(players_bio)
 
 We removed 99 rows from bio (missing age, experience_years or weight), which leaves 1699 player-seasons.
 
-#### impact
+#### Impact
 
 ```{r}
 #| label: clean-impact
@@ -183,3 +185,44 @@ nrow(impact) - nrow(players_impact)
 ```
 
 We removed 1402 rows from impact (playoff rows and players with fewer than 250 minutes), which leaves 1270 player-seasons.
+
+### Player Box statistic
+
+```{r}
+#| label: player-mean-stat
+player_mean_stat <- players_stats |>
+  group_by(athlete_display_name, team_abbreviation) |>
+  summarise(
+    number_matchs = n(),
+    ppg = mean(points, na.rm = TRUE),
+    rpg = mean(rebounds, na.rm = TRUE),
+    apg = mean(assists, na.rm = TRUE),
+    sum_minutes = sum(minutes),
+    mean_minutes = mean(minutes),
+    plus_minus = mean(plus_minus),
+    .groups = "drop"
+  )
+
+# all players
+nrow(player_mean_stat)
+summary(player_mean_stat$players_stats)
+sum(player_mean_stat$number_matchs < 20)
+
+# players with at least 20 games
+player_mean_stat_20 <- player_mean_stat |> filter(number_matchs >= 20)
+nrow(player_mean_stat_20)
+summary(player_mean_stat_20$mean_minutes)
+
+# top 10 by plus-minus
+player_mean_stat_20 |>
+  arrange(desc(plus_minus)) |>
+  print(n = 10, width = Inf)
+```
+
+**Glossary of Terms:**
+
+- **ppg:** points per game, in average. Players earn 1 point for a free throw, 2 points for a regular shot inside the three-point arc, and 3 points for a shot made from beyond the three-point line.
+- **rpg:** rebounds per game, in average. Grabbing the basketball after a missed field goal or free throw attempt. An offensive rebound happens when the shooting team retrieves its own missed shot to extend their possession, while a defensive rebound happens when the defending team grabs the miss to gain possession.
+- **apg:** assists per game, in average. A pass made directly to a teammate that leads to a made basket. To count as an assist, the scorer must immediately shoot or make a quick move toward the hoop without taking too many dribbles.
+
+Grouping by player and team gives 1,193 player-team pairs, but the median pair has only 22 games, and 548 pairs have fewer than 20 games. These short stays are mostly bench players (median 11.2 minutes per game), and their averages are based on too few games to be reliable, so we keep the 645 pairs with at least 20 games. These players play between 3.3 and 35.1 minutes per game (median 18.8).
